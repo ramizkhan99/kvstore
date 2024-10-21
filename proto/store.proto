@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/ramizkhan99/kvserver-proto";
+option go_package = "github.com/ramizkhan99/kvstore-proto";
 
 service Store {
     rpc Set (SetRequest) returns (SetResponse) {}
