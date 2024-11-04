@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/cockroachdb/pebble"
@@ -10,8 +11,8 @@ type database struct {
 	db *pebble.DB
 }
 
-func connectDB() (*database, error) {
-	db, err := pebble.Open("distkv", &pebble.Options{})
+func connectDB(port uint8) (*database, error) {
+	db, err := pebble.Open(fmt.Sprintf("store-%d", port), &pebble.Options{})
 	if err != nil {
 		log.Fatalf("failed to open connection to db: %v", err)
 		return nil, err

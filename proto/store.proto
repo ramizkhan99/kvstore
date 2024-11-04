@@ -40,3 +40,12 @@ message StatsResponse {
     string key_count = 1;
     string value_count = 2;
 }
+
+enum StoreError {
+    KEY_FOUND = 0;
+    KEY_TOO_LONG = 1;
+    KEY_NOT_FOUND = 2;
+    SERVER_ERROR = 3;
+    INVALID_KEY = 4;
+    INVALID_VALUE = 5;
+}

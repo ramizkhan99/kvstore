@@ -1,15 +1,18 @@
 package server
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net"
+	"sync"
 
 	pb "github.com/ramizkhan99/kvserver/src/generated"
-	"github.com/ramizkhan99/kvserver/src/store"
 	"google.golang.org/grpc"
+)
+
+const (
+	port_offset = 50051
 )
 
 var (
@@ -17,48 +20,80 @@ var (
 )
 
 type server struct {
+	id             uint8
+	is_coordinator bool
+	coordinator    uint8
+	mu             sync.Mutex
+	network        map[uint8]*connectedServer
+	port           int
+	Wg             sync.WaitGroup
+	grpc_server    *grpc.Server
 	pb.UnimplementedStoreServer
+	pb.UnimplementedServerServer
 }
 
-func (s *server) Set(_ context.Context, in *pb.SetRequest) (*pb.SetResponse, error) {
-	log.Printf("Setting pair in db: %v -> %v", in.GetKey(), in.GetValue())
-	err := store.SetKey(in.GetKey(), in.GetValue())
-	if err != nil {
-		return nil, err
-	}
-	return &pb.SetResponse{Result: "OK"}, nil
+type connectedServer struct {
+	id             uint8
+	is_active      bool
+	is_coordinator bool
+	client         *pb.ServerClient
 }
 
-func (s *server) Get(_ context.Context, in *pb.GetRequest) (*pb.GetResponse, error) {
-	log.Printf("Getting pair from db: %v", in.GetKey())
-	value, err := store.GetKey(in.GetKey())
-	if err != nil {
-		return nil, err
-	}
-	return &pb.GetResponse{Value: value}, nil
-}
-
-func (server *server) GetPrefix(ctx context.Context, in *pb.GetPrefixRequest) (*pb.GetPrefixResponse, error) {
-	// TODO: Define get prefix
-	log.Printf("Getting prefix from db: %v", in.GetPrefix())
-	// values, err := store.GetPrefix(in.GetPrefix())
-	// if err != nil {
-	// 	return nil, err
-	// }
-	return &pb.GetPrefixResponse{Value: nil}, nil
-}
-
-func Connect() {
+func Start() (*server, error) {
 	flag.Parse()
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+
+	s, err := createServer(*port)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		return nil, err
 	}
 
-	s := grpc.NewServer()
-	pb.RegisterStoreServer(s, &server{})
-	log.Printf("server listening at %v", lis.Addr())
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	s.port = *port
+	s.id = uint8(*port - port_offset)
+	s.is_coordinator = s.id == 0
+	s.network = make(map[uint8]*connectedServer)
+	log.Printf("Server %d initialized", s.id)
+
+	s.discover()
+
+	return s, nil
+}
+
+func createServer(port int) (*server, error) {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return nil, err
 	}
+
+	s := &server{}
+	gs := grpc.NewServer()
+	s.grpc_server = gs
+
+	log.Printf("server starting at %v", lis.Addr())
+
+	s.Wg.Add(1)
+	go func() {
+		defer s.Wg.Done()
+		pb.RegisterStoreServer(gs, s)
+		pb.RegisterServerServer(gs, s)
+		if err := gs.Serve(lis); err != nil {
+			log.Fatalf("failed to serve: %v", err)
+		}
+	}()
+	log.Println("server started")
+
+	return s, nil
+}
+
+func (s *server) Shutdown() {
+	s.mu.Lock()
+	s.grpc_server.GracefulStop()
+	s.mu.Unlock()
+}
+
+func (s *server) GetPort() int {
+	return s.port
+}
+
+func (s *server) GetId() uint8 {
+	return s.id
 }

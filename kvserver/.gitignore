@@ -1,3 +1,3 @@
 .vscode
-distkv
+store-[0-9]*
 src/generated

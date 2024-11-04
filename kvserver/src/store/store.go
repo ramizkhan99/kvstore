@@ -11,9 +11,9 @@ const (
 	maxWidthOfKey = 16
 )
 
-func Init() {
+func StartDB(port uint8) {
 	var err error
-	db, err = connectDB()
+	db, err = connectDB(port)
 	if err != nil {
 		log.Fatalf("failed to connect to db %v", err)
 	}

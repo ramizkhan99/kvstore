@@ -3,8 +3,39 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/ramizkhan99/kvserver-proto";
+option go_package = "github.com/ramizkhan99/kvstore-proto";
 
 service Server {
-    rpc Heartbeat (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc Ping (google.protobuf.Empty) returns (HeartbeatResponse) {}
+    rpc Heartbeat (google.protobuf.Empty) returns (stream HeartbeatResponse) {}
+    rpc JoinServer (JoinRequest) returns (JoinResponse) {}
+    rpc KillServer (KillRequest) returns (KillResponse) {}
+}
+
+message HeartbeatResponse {
+    ServerStatus status = 1;
+    string server_id = 2;
+}
+
+message JoinRequest {
+    int32 server_id = 1;
+}
+
+message JoinResponse {
+    ServerStatus status = 1;
+    int32 coordinator_port = 2;
+}
+
+message KillRequest {
+    string server_id = 1;
+}
+
+message KillResponse {
+    ServerStatus status = 1;
+}
+
+enum ServerStatus {
+    NO_RESPONSE = 0;
+    OK = 1;
+    INTERNAL_ERROR = 2;
 }
